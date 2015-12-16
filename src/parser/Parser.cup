@@ -1,0 +1,629 @@
+package parser;
+
+import java_cup.runtime.*;
+
+import java_cup.parser;
+import java.io.*;
+import java.util.*;
+import AbstractSyntaxTree.*;
+import Symbols.Token.*;
+import scanner.Scanner;
+
+parser code{:
+
+    public NodeTree root = null; /* nodo raiz del arbol sintactico abstracto */
+    public String cadenaProduccion = " "; /* contiene la cadena de producciones */
+
+    public void report_fatal_error(String message, Object info) {
+        report_error(message, info);
+        System.exit(1);
+    }
+
+    /* Metodo encargado de desplegar mensaje de error con mayor informacion */
+    public void report_error(String message, Object info) {
+        StringBuilder m = new StringBuilder("Error");
+        if (info instanceof java_cup.runtime.Symbol) {
+            java_cup.runtime.Symbol s = ((java_cup.runtime.Symbol) info);
+            if (s.left >= 0) {                
+                m.append(" in line "+(s.left+1));
+                if (s.right >= 0)
+                    m.append(", column "+(s.right+1));
+            }
+        }
+        m.append(" : "+message + " -> Parser");
+        System.err.println(m);
+    }
+
+    public void syntax_error(Symbol s){
+        System.out.println("Compilador a detectado un error sintáctico en la línea " + s.left + " y columna " + s.right + " -> " + s.value); 
+    }
+
+    /* Metodo encargado de iniciar el arbol sintactico abstracto */
+    public void setAbstractSyntaxTree(NodeTree n){
+        this.root = n;
+    }
+
+    /* Metodo encargado de obtener el arbol sintactico abstracto */
+    public NodeTree getAbstractSyntaxTree() throws Exception {
+        if(root == null){
+            this.parse();
+        }
+        return this.root;
+    }
+
+    public static void main(String [] args){
+        try{
+            Parser p = new Parser(new Scanner( new FileReader(args[0])));
+            Object result = p.parse().value;
+        }
+        catch(Exception e){
+        }
+    }
+:};
+
+
+
+
+/* **************************************************************** */
+/* ********************* SIMBOLOS TERMINALES ********************** */
+/* **************************************************************** */
+  
+terminal            ASSIGN, EXPO1, EXPO2, SUMA, MULT, RESTA, DIV;
+terminal            EQ, LT, LEQ, GT, GEQ, NEQ;
+terminal            LCURLYB, RCURLYB, LSQUAREB, RSQUAREB, LCIRCLEB, RCIRCLEB;
+terminal            SEMICOLON, COMMA;
+terminal            IF, ELSE, INT, RETURN, WHILE, FOR, VOID;
+terminal    String  ID;
+terminal    Integer NUM;
+
+
+
+/* **************************************************************** */
+/* ******************** SIMBOLOS NO TERMINALES ******************** */
+/* **************************************************************** */
+
+non terminal        NodeProgram             program, declaration_list;
+non terminal        NodeTree                declaration;  
+non terminal        Integer                 type_specifier;
+non terminal        NodeVarDeclaration      var_declaration;
+non terminal        NodeFunDeclaration      fun_declaration;  
+non terminal        NodeTree                param_list;
+non terminal        NodeTree                params;
+non terminal        NodeTree                param;
+non terminal        NodeTree                selection_stmt;
+non terminal        NodeTree                iteration_stmt, while_stmt, return_stmt;
+non terminal        NodeTree                for_stmt;
+non terminal        ArrayList<NodeTree>     local_declarations, statement_list;
+non terminal        NodeTree                statement, compound_stmt;   
+non terminal        Integer                 relop, addop, mulop, powop;
+non terminal        NodeTree                var, expression, exp, expression_stmt;
+non terminal        NodeTree                term, additive_expression, simple_expression;
+non terminal        NodeTree                factor, call, args, arg_list;
+   
+
+
+/* **************************************************************** */
+/* **************** ASOCIATIVIDAD Y PRECEDENCIA ******************* */
+/* **************************************************************** */
+
+precedence left ELSE;
+precedence left SUMA, RESTA;
+precedence left MULT, DIV;
+precedence left EXPO1, EXPO2;
+
+
+
+
+/* **************************************************************** */
+/* ************************** GRAMATICA *************************** */
+/* **************************************************************** */
+ 
+start with program;
+
+program             ::= declaration_list:dl 
+                            {:
+                                this.parser.cadenaProduccion = "program ::= declaration_list \n"+this.parser.cadenaProduccion;
+                                System.out.println(this.parser.cadenaProduccion);
+                                this.parser.root = dl;
+                                RESULT = dl;
+                            :};
+
+declaration_list    ::= declaration_list:dl declaration:d
+                            {:
+                                this.parser.cadenaProduccion = "declaration_list ::= declaration_list declaration \n"+this.parser.cadenaProduccion;
+                                if(d != null){
+                                    dl.listaDeclarationList.add(d);
+                                }
+                                RESULT = dl;
+                            :}
+                        | declaration:d 
+                            {:
+                                this.parser.cadenaProduccion = "declaration_list ::= declaration \n"+this.parser.cadenaProduccion;
+                                NodeProgram nodos = new NodeProgram();
+                                nodos.listaDeclarationList.add(d);
+                                RESULT = nodos;
+                            :};
+
+declaration         ::= var_declaration:vd 
+                            {:
+                                this.parser.cadenaProduccion = "declaration ::= var_declaration \n"+this.parser.cadenaProduccion;
+                                RESULT = vd;
+                            :} 
+                        | fun_declaration:fd 
+                            {:
+                                this.parser.cadenaProduccion = "declaration ::= fun_declaration \n"+this.parser.cadenaProduccion;
+                                RESULT = fd;
+                            :}/*
+                        | error:e
+                            {:
+                                parser.report_error("Syntax error, skip rest",e);
+                            :}*/;
+
+var_declaration     ::= type_specifier:ts ID:id SEMICOLON
+                            {:
+                                this.parser.cadenaProduccion = "var_declaration ::= type_specifier ID SEMICOLON \n"+this.parser.cadenaProduccion;
+                                NodeVarDeclaration nvd = new NodeVarDeclaration();
+                                nvd.arreglo = false;
+                                nvd.typeSpecifier = ts;
+                                nvd.identificador = id;
+                                RESULT = nvd;                                
+                            :}
+                        | type_specifier:ts ID:id LSQUAREB NUM:num RSQUAREB SEMICOLON 
+                            {:
+                                this.parser.cadenaProduccion = "var_declaration ::= type_specifier ID LSQUAREB NUM RSQUAREB SEMICOLON \n"+this.parser.cadenaProduccion;
+                                NodeVarDeclaration nvd = new NodeVarDeclaration();
+                                nvd.arreglo = true;
+                                nvd.typeSpecifier = ts;
+                                nvd.identificador = id;
+                                nvd.tamanoArreglo = num;
+                                RESULT = nvd;
+                            :};
+
+type_specifier      ::= INT:i
+                            {:
+                                this.parser.cadenaProduccion = "type_specifier ::= INT \n"+this.parser.cadenaProduccion;
+                                RESULT = sym.INT;
+                            :} 
+                        | VOID:v 
+                            {:
+                                this.parser.cadenaProduccion = "type_specifier ::= VOID \n"+this.parser.cadenaProduccion;
+                                RESULT = sym.VOID;
+                            :};
+
+fun_declaration     ::= type_specifier:ts ID:id LCIRCLEB params:ps RCIRCLEB compound_stmt:cs 
+                            {:
+                                this.parser.cadenaProduccion = "fun_declaration ::= type_specifier ID LCIRCLEB params RCIRCLEB compound_stmt \n"+this.parser.cadenaProduccion;
+                                if(ps instanceof NodeParam){
+                                    NodeFunDeclaration nfd = new NodeFunDeclaration();
+                                    nfd.typeSpecifier = ts;
+                                    nfd.identificador = id;
+                                    if(cs != null){
+                                        nfd.nodoCompStmt = (NodeCompoundStmt)cs;
+                                    }
+                                    nfd.listaParam.add((NodeParam)ps);
+                                    RESULT = nfd;
+                                }else{
+                                    NodeFunDeclaration nfd = new NodeFunDeclaration();
+                                    nfd.identificador = id;
+                                    nfd.typeSpecifier = ts;
+                                    if(cs != null){
+                                        nfd.nodoCompStmt = (NodeCompoundStmt)cs;
+                                    }
+                                    nfd.listaParam = ((NodeFunDeclaration)ps).listaParam;
+                                    RESULT = nfd;
+                                }
+                            :};
+
+params              ::= param_list:pl
+                            {:
+                                this.parser.cadenaProduccion = "params ::= param_list \n"+this.parser.cadenaProduccion;
+                                RESULT = pl;
+                            :} 
+                        | VOID:v
+                            {:
+                                this.parser.cadenaProduccion = "params ::= VOID \n"+this.parser.cadenaProduccion;
+                                NodeParam np = new NodeParam();
+                                np.typeSpecifier = sym.VOID;
+                                RESULT = np;
+                            :};
+
+param_list          ::= param_list:pl COMMA param:p
+                            {:
+                                this.parser.cadenaProduccion = "param_list ::= param_list COMMA param \n"+this.parser.cadenaProduccion;
+                                if(p != null){
+                                    ((NodeFunDeclaration) pl).listaParam.add(p);
+                                }else{
+                                    pl = new NodeFunDeclaration();
+                                }
+                                RESULT = pl;
+                            :} 
+                        | param:p
+                            {:
+                                this.parser.cadenaProduccion = "param_list ::= param \n"+this.parser.cadenaProduccion;
+                                NodeFunDeclaration nfd = new NodeFunDeclaration();
+                                nfd.listaParam.add(p);
+                                RESULT = nfd;
+                            :};
+
+param               ::= type_specifier:ts ID:id
+                            {:
+                                this.parser.cadenaProduccion = "param ::= type_specifier ID \n"+this.parser.cadenaProduccion;
+                                NodeParam np = new NodeParam();
+                                np.typeSpecifier = ts;
+                                np.identificador = id;
+                                np.parametroVector = false;
+                                RESULT = np;
+                            :}	
+                        | type_specifier:ts ID:id LSQUAREB RSQUAREB 
+                            {:
+                                this.parser.cadenaProduccion = "param ::= type_specifier ID LSQUAREB RSQUAREB \n"+this.parser.cadenaProduccion;
+                                NodeParam np = new NodeParam();
+                                np.typeSpecifier = ts;
+                                np.identificador = id;
+                                np.parametroVector = true;
+                                RESULT = np;
+                            :};
+
+compound_stmt       ::= LCURLYB local_declarations:ld statement_list:sl RCURLYB 
+                            {:
+                                this.parser.cadenaProduccion = "compound_stmt ::= LCURLYB local_declarations statement_list RCURLYB \n"+this.parser.cadenaProduccion;
+                                NodeCompoundStmt ncs = new NodeCompoundStmt();
+                                ncs.listaLocalDecl= ld;
+                                ncs.listaStmtList = sl;
+                                RESULT = ncs;
+                            :};
+
+local_declarations  ::= local_declarations:ld var_declaration:vd 
+                            {:
+                                this.parser.cadenaProduccion = "local_declarations ::= local_declarations var_declaration \n"+this.parser.cadenaProduccion;
+                                if(vd != null){
+                                    ld.add(vd);
+                                }
+                                RESULT = ld;
+                            :}
+                        |
+                            {:
+                                this.parser.cadenaProduccion = "local_declarations ::= EMPTY \n"+this.parser.cadenaProduccion;
+                                ArrayList<NodeTree> nodeList = new ArrayList<NodeTree>();
+                                RESULT = nodeList;
+                            :};
+
+statement_list      ::= statement_list:sl statement:s 
+                            {:
+                                this.parser.cadenaProduccion = "statement_list ::= statement_list statement \n"+this.parser.cadenaProduccion;
+                                if(s != null){
+                                    sl.add(s);
+                                }
+                                RESULT = sl;
+                            :}  
+                        |
+                            {:
+                                this.parser.cadenaProduccion = "statement_list ::= EMPTY \n"+this.parser.cadenaProduccion;
+                                ArrayList<NodeTree> nodeList = new ArrayList<NodeTree>();
+                                RESULT = nodeList;
+                            :};
+
+statement           ::= expression_stmt:es 
+                            {:
+                                this.parser.cadenaProduccion = "statement ::= expression_stmt \n"+this.parser.cadenaProduccion;
+                                RESULT = es;
+                            :} 
+                        | compound_stmt:cs 
+                            {:
+                                this.parser.cadenaProduccion = "statement ::= compound_stmt \n"+this.parser.cadenaProduccion;
+                                RESULT = cs;
+                            :} 
+                        | selection_stmt:ss 
+                            {:
+                                this.parser.cadenaProduccion = "statement ::= selection_stmt \n"+this.parser.cadenaProduccion;
+                                RESULT = ss;
+                            :} 
+                        | iteration_stmt:is 
+                            {:
+                                this.parser.cadenaProduccion = "statement ::= iteration_stmt \n"+this.parser.cadenaProduccion;
+                                RESULT = is;
+                            :}	
+                        | return_stmt:rs 
+                            {:
+                                this.parser.cadenaProduccion = "statement ::= return_stmt \n"+this.parser.cadenaProduccion;
+                                RESULT = rs;
+                            :};
+
+expression_stmt     ::= expression:e SEMICOLON 
+                            {:
+                                this.parser.cadenaProduccion = "expression_stmt ::= expression SEMICOLON \n"+this.parser.cadenaProduccion;
+                                RESULT = e;
+                            :} 
+                        | SEMICOLON 
+                            {:
+                                this.parser.cadenaProduccion = "expression_stmt ::= SEMICOLON \n"+this.parser.cadenaProduccion;
+                                RESULT = null;
+                            :};
+
+selection_stmt      ::= IF LCIRCLEB expression:e RCIRCLEB statement:s 
+                            {:
+                                this.parser.cadenaProduccion = "selection_stmt ::= IF LCURLYB expression RCURLYB statement \n"+this.parser.cadenaProduccion;
+                                NodeStatement ns = new NodeStatement();
+                                ns.tipoProduccion = "IF";
+                                ns.nodo1 = e;
+                                ns.nodo2 = s;
+                                RESULT = ns;
+                            :} 
+                        | IF LCIRCLEB expression:e RCIRCLEB statement:s1 ELSE statement:s2 
+                            {:
+                                this.parser.cadenaProduccion = "selection_stmt ::= IF LCIRCLEB expression RCIRCLEB statement ELSE statement \n"+this.parser.cadenaProduccion;
+                                NodeStatement ns = new NodeStatement();
+                                ns.tipoProduccion = "IF-ELSE";
+                                ns.nodo1 = e;
+                                ns.nodo2 = s1;
+                                ns.nodo3 = s2;
+                                RESULT = ns;
+                            :};
+
+iteration_stmt      ::= while_stmt:ws 
+                            {:
+                                this.parser.cadenaProduccion = "iteration_stmt ::= while_stmt \n"+this.parser.cadenaProduccion;
+                                RESULT = ws;
+                            :} 
+                        | for_stmt:fs 
+                            {:
+                                this.parser.cadenaProduccion = "iteration_stmt ::= for_stmt \n"+this.parser.cadenaProduccion;
+                                RESULT = fs;
+                            :};
+
+while_stmt          ::= WHILE LCIRCLEB expression:e RCIRCLEB statement:s 
+                            {:
+                                this.parser.cadenaProduccion = "while_stmt ::= WHILE LCIRCLEB expression RCIRCLEB statement \n"+this.parser.cadenaProduccion;
+                                NodeStatement ws = new NodeStatement();
+                                ws.tipoProduccion = "WHILE";
+                                ws.nodo1 = e;
+                                ws.nodo2 = s;
+                                RESULT = ws;
+                            :};
+
+for_stmt            ::= FOR LCIRCLEB expression:e1 COMMA expression:e2 COMMA expression:e3 RCIRCLEB statement:s 
+                            {:
+                                this.parser.cadenaProduccion = "for_stmt ::= FOR LCIRCLEB expression SEMICOLON expression SEMICOLON expression RCIRCLEB statement \n"+this.parser.cadenaProduccion;
+                                NodeStatement fs = new NodeStatement();
+                                fs.tipoProduccion = "FOR";
+                                fs.nodo1 = e1;
+                                fs.nodo2 = e2;
+                                fs.nodo3 = e3;
+                                fs.nodo4 = s;
+                                RESULT = fs;
+                            :};
+
+return_stmt         ::= RETURN SEMICOLON 
+                            {:
+                                this.parser.cadenaProduccion = "return_stmt ::= RETURN SEMICOLON \n"+this.parser.cadenaProduccion;
+                                NodeStatement ns = new NodeStatement();
+                                ns.tipoProduccion = "RETURN";
+                                RESULT = ns;
+                            :}
+                        | RETURN expression:e SEMICOLON 
+                            {:
+                                this.parser.cadenaProduccion = "return_stmt ::= RETURN expression SEMICOLON \n"+this.parser.cadenaProduccion;
+                                NodeStatement ns = new NodeStatement();
+                                ns.nodo1 = e;
+                                ns.tipoProduccion = "RETURN";
+                                RESULT = ns;
+                            :};
+
+expression          ::= var:v ASSIGN:a expression:e 
+                            {:
+                                this.parser.cadenaProduccion = "expression ::= var ASSIGN expression \n"+this.parser.cadenaProduccion;
+                                NodeExpression ne = new NodeExpression();
+                                ne.operador = sym.ASSIGN;
+                                ne.operando1 = v;
+                                ne.operando2 = e;
+                                RESULT = ne;
+                            :} 
+                        | simple_expression:se 
+                            {:
+                                this.parser.cadenaProduccion = "expression ::= simple_expression \n"+this.parser.cadenaProduccion;
+                                RESULT = se;
+                            :};
+
+var                 ::= ID:id
+                            {:
+                                this.parser.cadenaProduccion = "var ::= ID \n"+this.parser.cadenaProduccion;
+                                NodeVar nv = new NodeVar();
+                                nv.identificador = id;
+                                RESULT = nv;
+                            :} 
+                        | ID:id LSQUAREB expression:e RSQUAREB 
+                            {:
+                                this.parser.cadenaProduccion = "var ::= ID LSQUAREB expression RSQUAREB \n"+this.parser.cadenaProduccion;
+                                NodeVar nv = new NodeVar();
+                                nv.identificador = id;
+                                nv.nodeTree = e;
+                                RESULT = nv;
+                            :};
+
+simple_expression   ::= additive_expression:ae1 relop:r additive_expression:ae2 
+                            {:
+                                this.parser.cadenaProduccion = "simple_expression ::= additive_expression relop aditive_expression \n"+this.parser.cadenaProduccion;
+                                NodeExpression ne = new NodeExpression();
+                                ne.operador = r;
+                                ne.operando1 = ae1;
+                                ne.operando2 = ae2;
+                                RESULT = ne;
+                            :} 
+                        | additive_expression:ae 
+                            {:
+                                this.parser.cadenaProduccion = "simple_expression ::= additive_expression \n"+this.parser.cadenaProduccion;
+                                RESULT = ae;
+                            :};
+
+relop               ::= LEQ:l
+                            {:
+                                this.parser.cadenaProduccion = "relop ::= LEQ \n"+this.parser.cadenaProduccion;
+                                RESULT = sym.LEQ;
+                            :}
+                        | LT:l
+                            {:
+                                this.parser.cadenaProduccion = "relop ::= LT \n"+this.parser.cadenaProduccion;
+                                RESULT = sym.LT;
+                            :}
+                        | GT:g
+                            {:
+                                this.parser.cadenaProduccion = "relop ::= GT \n"+this.parser.cadenaProduccion;
+                                RESULT = sym.GT;
+                            :}
+                        | GEQ:g
+                            {:
+                                this.parser.cadenaProduccion = "relop ::= GEQ \n"+this.parser.cadenaProduccion;
+                                RESULT = sym.GEQ;
+                            :}
+                        | EQ:e
+                            {:
+                                this.parser.cadenaProduccion = "relop ::= EQ \n"+this.parser.cadenaProduccion;
+                                RESULT = sym.EQ;
+                            :}
+                        | NEQ:n
+                            {:
+                                this.parser.cadenaProduccion = "relop ::= NEQ \n"+this.parser.cadenaProduccion;
+                                RESULT = sym.NEQ;
+                            :};
+
+additive_expression ::= additive_expression:ae addop:a term:t 
+                            {:
+                                this.parser.cadenaProduccion = "additive_expression ::= additive_expression addop term \n"+this.parser.cadenaProduccion;
+                                NodeExpression ne = new NodeExpression();
+                                ne.operador = a;
+                                ne.operando1 = ae;
+                                ne.operando2 = t;
+                                RESULT = ne;
+                            :} 
+                        | term:t 
+                            {:
+                                this.parser.cadenaProduccion = "additive_expression ::= term \n"+this.parser.cadenaProduccion;
+                                RESULT = t;
+                            :};
+
+addop               ::= SUMA:s
+                            {:
+                                this.parser.cadenaProduccion = "addop ::= SUMA \n"+this.parser.cadenaProduccion;
+                                RESULT = sym.SUMA;
+                            :} 
+                        | RESTA:r
+                            {:
+                                this.parser.cadenaProduccion = "addop ::= RESTA \n"+this.parser.cadenaProduccion;
+                                RESULT = sym.RESTA;
+                            :};
+
+term                ::= term:t mulop:m factor:f 
+                            {:
+                                this.parser.cadenaProduccion = "term ::= term mulop factor \n"+this.parser.cadenaProduccion;
+                                NodeExpression ne = new NodeExpression();
+                                ne.operador = m;
+                                ne.operando1 = t;
+                                ne.operando2 = f;
+                                RESULT = ne;
+                            :} 
+                        | factor:f 
+                            {:
+                                this.parser.cadenaProduccion = "term ::= factor \n"+this.parser.cadenaProduccion;
+                                RESULT = f;
+                            :};
+
+mulop               ::= MULT:m
+                            {:
+                                this.parser.cadenaProduccion = "mulop ::= MULT \n"+this.parser.cadenaProduccion;
+                                RESULT = sym.MULT;
+                            :} 
+                        | DIV:d
+                            {:
+                                this.parser.cadenaProduccion = "mulop ::= DIV \n"+this.parser.cadenaProduccion;
+                                RESULT = sym.DIV;
+                            :};
+
+factor              ::= factor:f powop:p exp:e 
+                            {:
+                                this.parser.cadenaProduccion = "factor ::= factor powop exp \n"+this.parser.cadenaProduccion;
+                                NodeExpression ne = new NodeExpression();
+                                ne.operador = p;
+                                ne.operando1 = f;
+                                ne.operando2 = e;
+                                RESULT = ne;
+                            :}
+                        | exp:e 
+                            {:
+                                this.parser.cadenaProduccion = "factor ::= exp \n"+this.parser.cadenaProduccion;
+                                RESULT = e;
+                            :};
+
+powop               ::= EXPO1:e
+                            {:
+                                this.parser.cadenaProduccion = "powop ::= EXPO1 \n"+this.parser.cadenaProduccion;
+                                RESULT = sym.EXPO1;
+                            :}
+                        | EXPO2:e
+                            {:
+                                this.parser.cadenaProduccion = "powop ::= EXPO2 \n"+this.parser.cadenaProduccion;
+                                RESULT = sym.EXPO2;
+                            :};
+
+exp                 ::= LCIRCLEB expression:e RCIRCLEB 
+                            {:
+                                this.parser.cadenaProduccion = "exp ::= LCIRCLEB expression RCIRCLEB \n"+this.parser.cadenaProduccion;
+                                RESULT = e;
+                            :}
+                        | var:v 
+                            {:
+                                this.parser.cadenaProduccion = "exp ::= var \n"+this.parser.cadenaProduccion;
+                                RESULT = v;
+                            :}
+                        | call:c 
+                            {:
+                                this.parser.cadenaProduccion = "exp ::= call \n"+this.parser.cadenaProduccion;
+                                RESULT = c;
+                            :}
+                        | NUM:num
+                            {:
+                                this.parser.cadenaProduccion = "exp ::= NUM \n"+this.parser.cadenaProduccion;
+                                NodeVar nv = new NodeVar();
+                                nv.tipo = "numero";
+                                nv.valorNumero = num;
+                                nv.numero = num;
+                                RESULT = nv;
+                            :};
+
+call                ::= ID:id LCIRCLEB args:ar RCIRCLEB 
+                            {:
+                                this.parser.cadenaProduccion = "call ::= ID:id LCIRCLEB args RCIRCLEB \n"+this.parser.cadenaProduccion;
+                                NodeCall nc = new NodeCall();
+                                nc.identificador = id;
+                                nc.listaNodos.add(ar);
+                                RESULT = nc;
+                            :};
+
+args                ::= arg_list:al 
+                            {:
+                                this.parser.cadenaProduccion = "args ::= arg_list \n"+this.parser.cadenaProduccion;
+                                RESULT = al;
+                            :} 
+                        | 
+                            {:
+                                this.parser.cadenaProduccion = "args ::= EMPTY \n"+this.parser.cadenaProduccion;
+                                NodeCall nc = new NodeCall();
+                                RESULT = nc;
+                            :};
+
+arg_list            ::= arg_list:al COMMA expression:e 
+                            {:
+                                this.parser.cadenaProduccion = "arg_list ::= arg_list COMMA expression \n"+this.parser.cadenaProduccion;
+                                if(e != null){
+                                    NodeCall nc = new NodeCall();
+                                    nc = (NodeCall)al;
+                                    nc.listaNodos.add(e);
+                                }
+                                RESULT = al;
+                            :}  	
+                        | expression:e 
+                            {:
+                                this.parser.cadenaProduccion = "arg_list ::= expression \n"+this.parser.cadenaProduccion;
+                                NodeCall nc = new NodeCall();
+                                nc.listaNodos.add(e);
+                                RESULT = nc;
+                            :};
