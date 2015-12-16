@@ -101,7 +101,7 @@ public class CodeGenTemplates {
         label = labelMaximo;
     }
     
-    //metodo encargado de lacarga de dconstantes
+    //metodo encargado de la carga de constantes
     public static void pseudo_mov_const(int dst, int x, String c)
     {
         emit_RM("LDC", dst, x, 0, c);

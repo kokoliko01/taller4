@@ -214,8 +214,9 @@ public class CodeGeneration implements ExtendedVisitorInterface {
 
     @Override
     public void toVisit(NodeParam nodeParam, Symbol _symbol) {
+        //se verifica que el nodo no sea nulo
         if(nodeParam != null){
-            nodeParam.accept(this, null);
+            nodeParam.accept(this, null); //se visita el nodo 
         }
     }
 
@@ -231,9 +232,14 @@ public class CodeGeneration implements ExtendedVisitorInterface {
         prelude_input();
         prelude_output();
         
+        NodeFunDeclaration nfd = new NodeFunDeclaration();
+        
         ArrayList<NodeTree> listaDeclaraciones = nodeProgram.listaDeclarationList;
         for(NodeTree nt: listaDeclaraciones){
             if(nt != null){
+                if(nt.identificador.equalsIgnoreCase("main")){
+                    //((NodeTree)nfd) = nt;
+                }
                 nt.accept(this, null);
             }
             
@@ -262,62 +268,41 @@ public class CodeGeneration implements ExtendedVisitorInterface {
         
         switch(nodeStmt.tipoProduccion){
             case "IF":
+                //estamento para IF
                 System.out.println(" IF ");
                 mensajes = mensajes + " IF \n";
-                if(nodeStmt.nodo3 == null){
-                    nodeStmt.nodo1.accept(this, null);
-                    aux1 = emit_skip(1);
-                    System.out.println(" SALTO A ELSE ");
-                    mensajes = mensajes + " SALTO A ELSE \n";
-                    nodeStmt.nodo2.accept(this, null);
-                    aux2 = emit_skip(1);
-                    System.out.println(" SALTO A FINAL DE IF ");
-                    mensajes = mensajes + " SALTO A FINAL DE IF \n";
-                    
-                    actual = emit_skip(1);
-                    emit_backup(aux1);
-                    emit_RM("JEQ", CodeGenTemplates.registroAx, actual, CodeGenTemplates.zero,"SI AX == 0, PC = Direccion del ELSE");
-                    emit_restore();
-                }else{
-                    nodeStmt.nodo1.accept(this, null);
-                    aux1 = emit_skip(1);
-                    System.out.println(" SALTO A ELSE ");
-                    mensajes = mensajes + " SALTO A ELSE \n";
-                    nodeStmt.nodo2.accept(this, null);
-                    aux2 = emit_skip(1);
-                    System.out.println(" SALTO A FINAL DE IF ");
-                    mensajes = mensajes + " SALTO A FINAL DE IF \n";
-                    
-                    actual = emit_skip(1);
-                    emit_backup(aux1);
-                    emit_RM("JEQ", CodeGenTemplates.registroAx, actual, CodeGenTemplates.zero,"SI AX == 0, PC = Direccion del ELSE");
-                    emit_restore();
-                    nodeStmt.nodo3.accept(this, null);
-                    actual = emit_skip(0);
-                    emit_backup(aux2);
-                    
-                    pseudo_mov_const(CodeGenTemplates.programCounter, actual, " Program Counter = direccion de END-IF");
-                    emit_restore();
-                    System.out.println(" FINAL DE IF ");
-                    mensajes = mensajes + " FINAL DE IF \n";
-                }
-                break;
-            case "IF-ELSE":
-                nodeStmt.nodo1.accept(this, null);
-                aux1 = emit_skip(1);
+
+                nodeStmt.nodo1.accept(this, null);//se visita el nodo
+                aux1 = emit_skip(1); //salto de linea
                 System.out.println(" SALTO A ELSE ");
                 mensajes = mensajes + " SALTO A ELSE \n";
-                nodeStmt.nodo2.accept(this, null);
-                aux2 = emit_skip(1);
+                nodeStmt.nodo2.accept(this, null); //se visita el siguiente nodo
+                aux2 = emit_skip(1); //salto de linea
                 System.out.println(" SALTO A FINAL DE IF ");
                 mensajes = mensajes + " SALTO A FINAL DE IF \n";
-
-                actual = emit_skip(1);
+                actual = emit_skip(1);//salto de linea
                 emit_backup(aux1);
                 emit_RM("JEQ", CodeGenTemplates.registroAx, actual, CodeGenTemplates.zero,"SI AX == 0, PC = Direccion del ELSE");
                 emit_restore();
-                nodeStmt.nodo3.accept(this, null);
-                actual = emit_skip(0);
+                break;
+                
+            case "IF-ELSE":
+                //estamento para IF-ELSE
+                nodeStmt.nodo1.accept(this, null);//se visita el nodo
+                aux1 = emit_skip(1); //salto de linea
+                System.out.println(" SALTO A ELSE ");
+                mensajes = mensajes + " SALTO A ELSE \n";
+                nodeStmt.nodo2.accept(this, null);
+                aux2 = emit_skip(1);//salto de linea
+                System.out.println(" SALTO A FINAL DE IF ");
+                mensajes = mensajes + " SALTO A FINAL DE IF \n";
+
+                actual = emit_skip(1); //salto de linea
+                emit_backup(aux1);
+                emit_RM("JEQ", CodeGenTemplates.registroAx, actual, CodeGenTemplates.zero,"SI AX == 0, PC = Direccion del ELSE");
+                emit_restore();
+                nodeStmt.nodo3.accept(this, null); //se visita nodo
+                actual = emit_skip(0);//se recupera la direccion
                 emit_backup(aux2);
 
                 pseudo_mov_const(CodeGenTemplates.programCounter, actual, " Program Counter = direccion de END-IF");
@@ -325,6 +310,7 @@ public class CodeGeneration implements ExtendedVisitorInterface {
                 System.out.println(" FINAL DE IF ");
                 mensajes = mensajes + " FINAL DE IF \n";
                 break;
+                
             case "FOR":
                 System.out.println(" CICLO FOR ");
                 mensajesCodigo(" CICLO FOR ");
@@ -335,6 +321,7 @@ public class CodeGeneration implements ExtendedVisitorInterface {
                 
                 break;
             case "WHILE":
+                
                 System.out.println(" CICLO WHILE ");
                 mensajesCodigo(" CICLO WHILE ");
                 aux1 = emit_skip(0);
@@ -358,7 +345,7 @@ public class CodeGeneration implements ExtendedVisitorInterface {
             case "RETURN":
                 System.out.println(" RETURN ");
                 mensajes = mensajes + " RETURN \n";
-                nodeStmt.nodo1.accept(this, null);
+                nodeStmt.nodo1.accept(this, null); //se visita el nodo
                 System.out.println(" FINAL RETURN ");
                 mensajes = mensajes + " FINAL RETURN \n";
                 break;
