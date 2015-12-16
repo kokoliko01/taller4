@@ -42,17 +42,18 @@ public class CodeGeneration implements ExtendedVisitorInterface {
         Symbol sym = nfd.simbolito;
         Scope sco = sym.alcance;
         SymbolTable st = new SymbolTable();
-        //se busca la funcion con el identificador dado
-        sym = st.busquedaImplacable(nodoCall.identificador, sco);
+        sym = st.busquedaImplacable(nodoCall.identificador, sco); //se busca la funcion llamada
         nfd = sym.nfd;
         
         int contador = 1;
+        //se reocrre los parametros del llamado de funcion
         for(NodeTree nt : nodoCall.listaNodos){
+            //se verifica que el nodo no sea nulo
             if(nt.identificador != null){
-                nt.accept(this, null);
-                //se agrega cada uno de los parametros del llamado
+                nt.accept(this, null); //se recorre el parametro
+                //se agrega el parametro n-esimo
                 emit_push(registroAx, "Push Ax , parametro " + contador);
-                contador++;
+                contador++; //cantidad de parametros aumenta
             }
             //n.accept(this);
         }
@@ -65,10 +66,12 @@ public class CodeGeneration implements ExtendedVisitorInterface {
     public void toVisit(NodeCompoundStmt nodeCompStmt, Symbol _symbol) {
         System.out.println(" COMPOUND STMT");
         mensajesCodigo(" COMPOUND STMT");
+        //se obtienen los nodos de declaraciones
         ArrayList<NodeTree> listaParametros = nodeCompStmt.listaLocalDecl;
         for(NodeTree nt: listaParametros){
+            //se verifica que el nodo no sea nulo
             if(nt != null){
-                nt.accept(this, null);
+                nt.accept(this, null);//se visita el nodo
             }
         }
         System.out.println(" COMPOUND STMT ");
@@ -80,62 +83,61 @@ public class CodeGeneration implements ExtendedVisitorInterface {
         mensajesCodigo("NODO EXPRESSION");
         System.out.println(" NODO EXPRESSION ");
         switch(nodeExpression.operador){
-            case 5: 
-                //suma
+            case 5:
                 nodeExpression.operando1.accept(this, null);
-                emit_push(CodeGenTemplates.registroAx, "push Ax"); //Se agrega el registro Ax
+                emit_push(CodeGenTemplates.registroAx, "push Ax");
                 mensajes = mensajes + "push Ax\n";
                 nodeExpression.operando2.accept(this, null);
-                emit_push(CodeGenTemplates.registroBx, "push Bx"); //se agrega el registro Bx
+                emit_push(CodeGenTemplates.registroBx, "push Bx");
                 mensajes = mensajes + "push Bx\n";
                 
-                emit_RO("ADD", CodeGenTemplates.registroAx, CodeGenTemplates.registroBx, CodeGenTemplates.registroAx, "ax = ax + bx"); //se suman los registros Ab y Bx
+                emit_RO("ADD", CodeGenTemplates.registroAx, CodeGenTemplates.registroBx, CodeGenTemplates.registroAx, "ax = ax + bx");
                 mensajes = mensajes + "add -> ax = ax + bx\n";
                 break;
             case 7:
                 //resta
                 nodeExpression.operando1.accept(this, null);
-                emit_push(CodeGenTemplates.registroAx, "push Ax");//Se agrega el registro Ax
+                emit_push(CodeGenTemplates.registroAx, "push Ax");
                 mensajes = mensajes + "push Ax\n";
                 nodeExpression.operando2.accept(this, null);
-                emit_push(CodeGenTemplates.registroBx, "push Bx");//se agrega el registro Bx
+                emit_push(CodeGenTemplates.registroBx, "push Bx");
                 mensajes = mensajes + "push Bx\n";
                 
-                emit_RO("SUB", CodeGenTemplates.registroAx, CodeGenTemplates.registroBx, CodeGenTemplates.registroAx, "ax = ax - bx");//se restan los registros Ab y Bx
+                emit_RO("SUB", CodeGenTemplates.registroAx, CodeGenTemplates.registroBx, CodeGenTemplates.registroAx, "ax = ax - bx");
                 mensajes = mensajes + "sub -> ax = ax - bx\n";
                 break;
             case 6:
                 //mult
                 nodeExpression.operando1.accept(this, null);
-                emit_push(CodeGenTemplates.registroAx, "push Ax");//Se agrega el registro Ax
+                emit_push(CodeGenTemplates.registroAx, "push Ax");
                 mensajes = mensajes + "push Ax\n";
                 nodeExpression.operando2.accept(this, null);
-                emit_push(CodeGenTemplates.registroBx, "push Bx");//se agrega el registro Bx
+                emit_push(CodeGenTemplates.registroBx, "push Bx");
                 mensajes = mensajes + "push Bx\n";
                 
-                emit_RO("MUL", CodeGenTemplates.registroAx, CodeGenTemplates.registroBx, CodeGenTemplates.registroAx, "ax = ax * bx");//se multiplican los registros Ab y Bx
+                emit_RO("MUL", CodeGenTemplates.registroAx, CodeGenTemplates.registroBx, CodeGenTemplates.registroAx, "ax = ax * bx");
                 mensajes = mensajes + "mul -> ax = ax * bx\n";
                 break;
             case 8:
                 //div
                 nodeExpression.operando1.accept(this, null);
-                emit_push(CodeGenTemplates.registroAx, "push Ax");//Se agrega el registro Ax
+                emit_push(CodeGenTemplates.registroAx, "push Ax");
                 mensajes = mensajes + "push Ax\n";
                 nodeExpression.operando2.accept(this, null);
-                emit_push(CodeGenTemplates.registroBx, "push Bx");//se agrega el registro Bx
+                emit_push(CodeGenTemplates.registroBx, "push Bx");
                 mensajes = mensajes + "push Bx\n";
                 
-                emit_RO("DIV", CodeGenTemplates.registroAx, CodeGenTemplates.registroBx, CodeGenTemplates.registroAx, "ax = ax / bx");//se dividen los registros Ab y Bx
+                emit_RO("DIV", CodeGenTemplates.registroAx, CodeGenTemplates.registroBx, CodeGenTemplates.registroAx, "ax = ax / bx");
                 mensajes = mensajes + "div -> ax = ax / bx\n";
                 break;
             case 3:
                 //expo1 raiz
                 nodeExpression.operando1.accept(this, null);
                 for(int i=0;i<nodeExpression.operando2.numero;i++){
-                    emit_push(CodeGenTemplates.registroAx, "push Ax");//Se agrega el registro Ax
+                    emit_push(CodeGenTemplates.registroAx, "push Ax");
                     mensajes = mensajes + "push Ax\n";
                     nodeExpression.operando2.accept(this, null);
-                    emit_push(CodeGenTemplates.registroBx, "push Bx");//se agrega el registro Bx
+                    emit_push(CodeGenTemplates.registroBx, "push Bx");
                     mensajes = mensajes + "push Bx\n";
 
                     emit_RO("MUL", CodeGenTemplates.registroAx, CodeGenTemplates.registroBx, CodeGenTemplates.registroAx, "ax = ax * bx");
@@ -146,10 +148,10 @@ public class CodeGeneration implements ExtendedVisitorInterface {
                 //expo2 potencia
                 nodeExpression.operando1.accept(this, null);
                 for(int i=0;i<nodeExpression.operando2.numero;i++){
-                    emit_push(CodeGenTemplates.registroAx, "push Ax");//Se agrega el registro Ax
+                    emit_push(CodeGenTemplates.registroAx, "push Ax");
                     mensajes = mensajes + "push Ax\n";
                     nodeExpression.operando2.accept(this, null);
-                    emit_push(CodeGenTemplates.registroBx, "push Bx");//se agrega el registro Bx
+                    emit_push(CodeGenTemplates.registroBx, "push Bx");
                     mensajes = mensajes + "push Bx\n";
 
                     emit_RO("MUL", CodeGenTemplates.registroAx, CodeGenTemplates.registroBx, CodeGenTemplates.registroAx, "ax = ax * bx");
